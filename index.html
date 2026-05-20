@@ -529,6 +529,15 @@ function renderList() {
   el.innerHTML = html;
 }
 
+function formatDate(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  const today = new Date();
+  const isToday = d.toDateString() === today.toDateString();
+  if (isToday) return null; // Pas besoin d'afficher si c'est aujourd'hui
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
 function parkingItemHTML(p) {
   const isOp = currentTab === 'op';
   const nb = p.places_disponibles;
@@ -537,11 +546,11 @@ function parkingItemHTML(p) {
   const g = gMeta(p.gestionnaire);
   const fav = isFav(p.id);
   const numStr = (nb === null || nb < 0) ? '—' : nb;
-  // meta
-  const etatStr = p.etat === 'données indisponibles' ? 'N/D' : p.etat || '';
+  const capStr = cap ? cap + ' places' : '—';
+  const dateAncienne = formatDate(p.last_update);
   const meta = isOp
     ? `${p.adresse || ''} · ${p.tarif_1h ? p.tarif_1h + ' €/h' : 'Tarif N/D'}`
-    : `${cap || '?'} places · Gratuit TCL`;
+    : `Gratuit TCL`;
   return `<div class="parking-item${fav ? ' favori' : ''}" onclick="showDetail('${p.id}')">
     <button class="star-btn${fav ? ' on' : ''}" onclick="toggleFav('${p.id}',event)" title="${fav ? 'Retirer des favoris' : 'Ajouter aux favoris'}">${fav ? '★' : '☆'}</button>
     <div class="p-icon ${g.cls}">${g.lbl}</div>
@@ -550,8 +559,14 @@ function parkingItemHTML(p) {
       <div class="p-meta">${meta}</div>
     </div>
     <div class="p-right">
-      <div class="p-places c-${s.cls}">${numStr}</div>
-      <div class="p-dot bg-${s.cls}"></div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:5px;justify-content:flex-end">
+          <div class="p-places c-${s.cls}">${numStr}</div>
+          <div class="p-dot bg-${s.cls}"></div>
+        </div>
+        <div style="font-size:8px;color:var(--muted);font-weight:700;margin-top:1px">/ ${capStr}</div>
+        ${dateAncienne ? `<div style="font-size:7px;color:#f87171;margin-top:1px">màj ${dateAncienne}</div>` : ''}
+      </div>
     </div>
   </div>`;
 }
@@ -673,11 +688,24 @@ function updateDetail(p) {
   document.getElementById('det-pct').textContent = (cap && s.pct) ? `${100 - s.pct}% occupé` : '—';
   document.getElementById('det-prog').style.width = s.pct + '%';
   document.getElementById('det-prog').className = `progress-fill bg-${s.cls}`;
-  document.getElementById('det-status').textContent = s.label;
+  document.getElementById('det-status').textContent = p.etat === 'données indisponibles' ? 'Données indisponibles' : s.label;
   document.getElementById('det-status').className = `status-pill c-${s.cls}`;
 
-  document.getElementById('det-cap').textContent = cap ? cap + ' places' : (isOp && nb >= 0 ? nb + ' places' : '—');
+  document.getElementById('det-cap').textContent = cap ? cap + ' places' : '—';
   document.getElementById('det-pmr').textContent = p.nb_pmr ? p.nb_pmr + ' places' : '—';
+
+  // Date de dernière mise à jour — afficher en rouge si pas aujourd'hui
+  const lastUpdateEl = document.getElementById('det-update');
+  const dateAncienne = formatDate(p.last_update);
+  if (dateAncienne) {
+    lastUpdateEl.textContent = `⚠️ données du ${dateAncienne}`;
+    lastUpdateEl.style.color = '#f87171';
+  } else {
+    lastUpdateEl.textContent = p.last_update
+      ? 'màj ' + new Date(p.last_update).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'})
+      : '—';
+    lastUpdateEl.style.color = 'var(--muted)';
+  }
 
   const tarifsSection = document.getElementById('tarifs-section');
   const horCell = document.getElementById('det-horaires-cell');
@@ -700,7 +728,6 @@ function updateDetail(p) {
   } else {
     navBtn.href = '#'; navBtn.style.opacity = '0.35'; navBtn.style.pointerEvents = 'none';
   }
-  document.getElementById('det-update').textContent = 'màj ' + new Date().toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
 }
 
 // ── INIT ──
