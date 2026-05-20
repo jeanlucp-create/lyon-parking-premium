@@ -478,6 +478,8 @@ function updateStats() {
 
 // ── ONGLETS ──
 function switchTab(tab) {
+  // Fermer le détail si ouvert
+  if (selectedParking) closeDetail();
   currentTab = tab;
   document.getElementById('tab-tcl').className = 'tab' + (tab === 'tcl' ? ' active' : '');
   document.getElementById('tab-op').className = 'tab' + (tab === 'op' ? ' active' : '');
@@ -489,6 +491,8 @@ function switchTab(tab) {
 
 // ── VUES ──
 function switchView(view) {
+  // Fermer le détail si ouvert
+  if (selectedParking) closeDetail();
   currentView = view;
   document.getElementById('btn-list').className = 'view-btn' + (view === 'list' ? ' active' : '');
   document.getElementById('btn-map').className = 'view-btn' + (view === 'map' ? ' active' : '');
@@ -646,6 +650,9 @@ function closeDetail() {
   if (refreshTimer) clearInterval(refreshTimer);
   selectedParking = null;
   document.getElementById('detail-view').style.display = 'none';
+  // Afficher la bonne vue (liste ou carte)
+  document.getElementById('list-view').style.display = currentView === 'list' ? 'block' : 'none';
+  document.getElementById('map-view').style.display = currentView === 'map' ? 'block' : 'none';
 }
 
 async function refreshDetail() {
