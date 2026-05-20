@@ -119,11 +119,14 @@
     .parking-item:active { transform: scale(0.98); }
     .parking-item.favori { border-color: var(--orange-border); background: #FFFAF5; }
     .star-btn {
-      width: 26px; height: 26px; flex-shrink: 0; display: flex; align-items: center;
-      justify-content: center; cursor: pointer; border-radius: 7px; border: none;
-      background: transparent; font-size: 16px; color: #DDD; transition: all 0.15s; line-height: 1;
+      width: 40px; height: 40px; flex-shrink: 0; display: flex; align-items: center;
+      justify-content: center; cursor: pointer; border-radius: 10px; border: none;
+      background: transparent; font-size: 20px; color: #DDD; transition: all 0.15s; line-height: 1;
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+      position: relative; z-index: 2;
     }
     .star-btn.on { color: var(--amber); }
+    .star-btn:active { transform: scale(1.2); background: rgba(255,149,0,0.1); }
     .p-icon {
       width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
@@ -424,7 +427,9 @@ function gMeta(g) {
 // ── FAVORIS ──
 function isFav(id) { return favorites.includes(id); }
 function toggleFav(id, e) {
+  e.preventDefault();
   e.stopPropagation();
+  e.stopImmediatePropagation();
   if (isFav(id)) favorites = favorites.filter(f => f !== id);
   else favorites.push(id);
   localStorage.setItem('lp_favorites', JSON.stringify(favorites));
@@ -556,7 +561,12 @@ function parkingItemHTML(p) {
     ? `${p.adresse || ''} · ${p.tarif_1h ? p.tarif_1h + ' €/h' : 'Tarif N/D'}`
     : `Gratuit TCL`;
   return `<div class="parking-item${fav ? ' favori' : ''}" onclick="showDetail('${p.id}')">
-    <button class="star-btn${fav ? ' on' : ''}" onclick="toggleFav('${p.id}',event)" title="${fav ? 'Retirer des favoris' : 'Ajouter aux favoris'}">${fav ? '★' : '☆'}</button>
+    <button class="star-btn${fav ? ' on' : ''}" 
+      onclick="toggleFav('${p.id}',event)" 
+      ontouchend="toggleFav('${p.id}',event)"
+      title="${fav ? 'Retirer des favoris' : 'Ajouter aux favoris'}"
+      aria-label="${fav ? 'Retirer des favoris' : 'Ajouter aux favoris'}"
+    >${fav ? '★' : '☆'}</button>
     <div class="p-icon ${g.cls}">${g.lbl}</div>
     <div class="p-info">
       <div class="p-name">${p.nom}</div>
