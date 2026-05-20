@@ -463,8 +463,8 @@ function updateStats() {
   const src = currentTab === 'tcl' ? allData.tcl : allData.operateurs;
   let dispo = 0, limite = 0, complet = 0;
   src.forEach(p => {
-    const nb = p.nb_places;
-    const cap = p.capacite || null;
+    const nb = p.places_disponibles;
+    const cap = p.nb_places || null;
     const s = getStatus(nb, cap);
     if (s.cls === 'green') dispo++;
     else if (s.cls === 'amber') limite++;
@@ -531,12 +531,14 @@ function renderList() {
 
 function parkingItemHTML(p) {
   const isOp = currentTab === 'op';
-  const nb = p.nb_places;
-  const cap = p.capacite || null;
+  const nb = p.places_disponibles;
+  const cap = p.nb_places || null;
   const s = getStatus(nb, cap);
   const g = gMeta(p.gestionnaire);
   const fav = isFav(p.id);
   const numStr = (nb === null || nb < 0) ? '—' : nb;
+  // meta
+  const etatStr = p.etat === 'données indisponibles' ? 'N/D' : p.etat || '';
   const meta = isOp
     ? `${p.adresse || ''} · ${p.tarif_1h ? p.tarif_1h + ' €/h' : 'Tarif N/D'}`
     : `${cap || '?'} places · Gratuit TCL`;
@@ -570,8 +572,8 @@ function renderMap() {
   const src = currentTab === 'tcl' ? allData.tcl : allData.operateurs;
   src.forEach(p => {
     if (!p.lat || !p.lng) return;
-    const nb = p.nb_places;
-    const cap = p.capacite || null;
+    const nb = p.places_disponibles;
+    const cap = p.nb_places || null;
     const s = getStatus(nb, cap);
     const colorMap = { green: '#2ECC71', amber: '#FF9500', red: '#FF3B30', gray: '#AAA' };
     const color = colorMap[s.cls];
@@ -656,8 +658,8 @@ async function refreshDetail() {
 
 function updateDetail(p) {
   const isOp = p.tab === 'op';
-  const nb = p.nb_places;
-  const cap = p.capacite || null;
+  const nb = p.places_disponibles;
+  const cap = p.nb_places || null;
   const s = getStatus(nb, cap);
   const g = gMeta(p.gestionnaire);
 
