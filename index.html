@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Lyon Parking</title>
+  <meta name="description" content="Disponibilité en temps réel des parkings de Lyon" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#FFF8F0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Lyon Parking" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --cream: #FFF8F0; --orange: #FF6B35; --orange-light: #FFF0E6;
+      --orange-border: #FFD4B0; --orange-dark: #CC5500;
+      --text: #1A1A2E; --muted: #AAA; --border: #F0EDE8;
+      --green: #2ECC71; --amber: #FF9500; --red: #FF3B30;
+      --white: #FFFFFF; --surface: #FAFAFA;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; overflow: hidden; }
+    body { font-family: 'Nunito', sans-serif; background: var(--cream); color: var(--text); display: flex; flex-direction: column; }
+
+    /* ── HEADER ── */
+    .header {
+      background: var(--cream); padding: 14px 16px 0;
+      flex-shrink: 0; position: relative; overflow: hidden;
+      border-bottom: 1px solid var(--orange-border);
+    }
+    .header-map-bg { position: absolute; right: -8px; top: -8px; opacity: 0.1; pointer-events: none; }
+    .header-top { display: flex; align-items: center; gap: 12px; position: relative; z-index: 1; margin-bottom: 10px; }
+    .header-logo {
+      width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+      background: linear-gradient(135deg, #FF6B35, #FF9B35);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 3px 10px rgba(255,107,53,0.3);
+    }
+    .header-title { font-size: 20px; font-weight: 900; color: var(--text); letter-spacing: -0.4px; line-height: 1; }
+    .header-title span { color: var(--orange); }
+    .header-sub { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+    .header-badge {
+      margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
+      background: var(--orange-light); border: 1px solid var(--orange-border);
+      color: var(--orange-dark); font-size: 9px; font-weight: 800;
+      padding: 4px 9px; border-radius: 100px; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+    }
+    .live-dot { width: 5px; height: 5px; background: var(--orange); border-radius: 50%; animation: lpulse 1.8s infinite; }
+    @keyframes lpulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
+
+    /* Stats */
+    .stats-row { display: flex; gap: 6px; margin-bottom: 10px; position: relative; z-index: 1; }
+    .stat { flex: 1; background: var(--white); border-radius: 10px; border: 1px solid var(--orange-border); padding: 8px 10px; text-align: center; }
+    .stat-num { font-size: 16px; font-weight: 900; line-height: 1; }
+    .stat-lbl { font-size: 8px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 5px; margin-bottom: 10px; position: relative; z-index: 1; }
+    .tab {
+      flex: 1; padding: 8px 6px; border-radius: 9px;
+      font-family: 'Nunito', sans-serif; font-size: 10px; font-weight: 800;
+      text-align: center; cursor: pointer; border: 1.5px solid var(--orange-border);
+      background: var(--white); color: var(--muted); transition: all 0.2s; letter-spacing: 0.02em;
+    }
+    .tab.active { background: var(--orange); color: white; border-color: var(--orange); }
+
+    /* View toggle */
+    .view-toggle { display: flex; gap: 5px; margin-bottom: 10px; position: relative; z-index: 1; }
+    .view-btn {
+      flex: 1; padding: 7px; border-radius: 9px; cursor: pointer;
+      font-family: 'Nunito', sans-serif; font-size: 10px; font-weight: 800;
+      border: 1.5px solid var(--orange-border); background: var(--white);
+      color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 5px;
+      transition: all 0.2s;
+    }
+    .view-btn.active { background: var(--orange-light); border-color: var(--orange-border); color: var(--orange-dark); }
+
+    /* Search + filter */
+    .search-row { display: flex; gap: 6px; margin-bottom: 6px; position: relative; z-index: 1; }
+    .search-wrap { flex: 1; position: relative; }
+    .search-input {
+      width: 100%; background: var(--white); border: 1.5px solid var(--orange-border);
+      border-radius: 10px; padding: 9px 12px 9px 34px;
+      font-family: 'Nunito', sans-serif; font-size: 12px; font-weight: 600;
+      color: var(--text); outline: none;
+    }
+    .search-input::placeholder { color: var(--muted); }
+    .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 14px; }
+    .fav-toggle {
+      padding: 9px 12px; border-radius: 10px; cursor: pointer;
+      border: 1.5px solid var(--orange-border); background: var(--white);
+      font-size: 14px; display: flex; align-items: center; gap: 4px;
+      font-family: 'Nunito', sans-serif; font-size: 10px; font-weight: 800;
+      color: var(--muted); white-space: nowrap; transition: all 0.2s;
+    }
+    .fav-toggle.active { background: var(--orange-light); border-color: var(--orange-border); color: var(--orange-dark); }
+
+    /* ── MAIN CONTENT ── */
+    .main { flex: 1; overflow: hidden; position: relative; }
+
+    /* LIST VIEW */
+    .list-view { height: 100%; overflow-y: auto; padding: 8px 16px 20px; -webkit-overflow-scrolling: touch; }
+    .section-label {
+      font-size: 9px; color: var(--amber); font-weight: 800;
+      letter-spacing: 0.1em; text-transform: uppercase; padding: 8px 2px 4px;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .section-label-all { color: var(--muted); }
+    .parking-list { display: flex; flex-direction: column; gap: 6px; }
+    .parking-item {
+      background: var(--white); border-radius: 13px; border: 1.5px solid var(--border);
+      padding: 11px 11px 11px 8px; display: flex; align-items: center; gap: 8px;
+      cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    }
+    .parking-item:active { transform: scale(0.98); }
+    .parking-item.favori { border-color: var(--orange-border); background: #FFFAF5; }
+    .star-btn {
+      width: 26px; height: 26px; flex-shrink: 0; display: flex; align-items: center;
+      justify-content: center; cursor: pointer; border-radius: 7px; border: none;
+      background: transparent; font-size: 16px; color: #DDD; transition: all 0.15s; line-height: 1;
+    }
+    .star-btn.on { color: var(--amber); }
+    .p-icon {
+      width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; font-weight: 900; letter-spacing: -0.03em;
+    }
+    .g-tcl { background: #E3F2FD; color: #1565C0; }
+    .g-lpa { background: #FFF3E0; color: #E65C00; }
+    .g-ind { background: #EDE7F6; color: #5E35B1; }
+    .g-qpk { background: #E8F5E9; color: #2E7D32; }
+    .p-info { flex: 1; min-width: 0; }
+    .p-name { font-size: 12px; font-weight: 800; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .p-meta { font-size: 9px; color: var(--muted); font-weight: 600; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .p-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .p-places { font-size: 17px; font-weight: 900; min-width: 30px; text-align: right; }
+    .p-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .c-green { color: var(--green); } .c-amber { color: var(--amber); } .c-red { color: var(--red); } .c-gray { color: var(--muted); }
+    .bg-green { background: var(--green); } .bg-amber { background: var(--amber); } .bg-red { background: var(--red); } .bg-gray { background: var(--muted); }
+
+    .loading-msg { text-align: center; color: var(--muted); font-size: 12px; font-weight: 600; padding: 32px 0; }
+    .error-msg { color: var(--red); font-size: 11px; text-align: center; padding: 10px; background: rgba(255,59,48,.08); border: 1px solid rgba(255,59,48,.2); border-radius: 10px; margin-bottom: 10px; }
+    .empty-msg { text-align: center; color: var(--muted); font-size: 12px; font-weight: 600; padding: 24px 0; }
+
+    /* MAP VIEW */
+    .map-view { height: 100%; display: none; position: relative; }
+    #map { width: 100%; height: 100%; }
+    .map-overlay-btn {
+      position: absolute; bottom: 16px; right: 16px; z-index: 999;
+      background: var(--orange); color: white; border: none; border-radius: 50%;
+      width: 46px; height: 46px; font-size: 20px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 3px 12px rgba(255,107,53,0.5); transition: transform 0.2s;
+    }
+    .map-overlay-btn:active { transform: scale(0.92); }
+
+    /* Leaflet popup custom */
+    .lp-popup { font-family: 'Nunito', sans-serif; min-width: 180px; }
+    .lp-popup-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .lp-popup-icon { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 900; flex-shrink: 0; }
+    .lp-popup-name { font-size: 13px; font-weight: 800; color: var(--text); line-height: 1.2; }
+    .lp-popup-places { font-size: 22px; font-weight: 900; line-height: 1; margin-bottom: 2px; }
+    .lp-popup-sub { font-size: 10px; color: var(--muted); font-weight: 600; margin-bottom: 10px; }
+    .lp-popup-btn {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: 100%; padding: 9px; border-radius: 9px;
+      background: var(--orange); color: white; font-family: 'Nunito', sans-serif;
+      font-size: 11px; font-weight: 800; text-decoration: none; letter-spacing: 0.03em;
+    }
+
+    /* DETAIL VIEW */
+    .detail-view {
+      position: absolute; inset: 0; background: var(--cream);
+      overflow-y: auto; display: none; z-index: 100;
+      padding: 12px 16px 32px; -webkit-overflow-scrolling: touch;
+    }
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: var(--white); border: 1.5px solid var(--orange-border);
+      color: var(--orange-dark); font-family: 'Nunito', sans-serif;
+      font-size: 11px; font-weight: 800; padding: 7px 14px;
+      border-radius: 100px; cursor: pointer; margin-bottom: 14px;
+    }
+    .det-card { background: var(--white); border-radius: 18px; border: 1.5px solid var(--border); padding: 20px; }
+    .det-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 20px; }
+    .det-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; flex-shrink: 0; }
+    .det-name { font-size: 19px; font-weight: 900; line-height: 1.1; letter-spacing: -0.3px; margin-bottom: 3px; }
+    .det-addr { font-size: 10px; color: var(--muted); font-weight: 600; line-height: 1.4; }
+    .det-num { font-size: 60px; font-weight: 900; line-height: 1; letter-spacing: -2px; }
+    .det-label { color: var(--muted); font-size: 11px; font-weight: 700; line-height: 1.4; }
+    .progress-wrap { margin: 14px 0; }
+    .progress-meta { display: flex; justify-content: space-between; font-size: 9px; color: var(--muted); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 5px; }
+    .progress-track { height: 4px; background: var(--border); border-radius: 99px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 99px; transition: width .8s cubic-bezier(.16,1,.3,1); }
+    .status-pill {
+      display: inline-flex; align-items: center; font-size: 10px; font-weight: 800;
+      letter-spacing: 0.08em; text-transform: uppercase; padding: 5px 12px;
+      border-radius: 100px; border: 1.5px solid currentColor; margin-bottom: 20px;
+    }
+    .tarifs-title { font-size: 9px; color: var(--muted); font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 7px; }
+    .tarifs-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 5px; margin-bottom: 14px; }
+    .tarif-cell { background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 9px 5px; text-align: center; }
+    .tarif-lbl { font-size: 8px; color: var(--muted); font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
+    .tarif-val { font-size: 12px; font-weight: 900; color: var(--text); }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 14px; }
+    .info-cell { background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: 11px; }
+    .info-cell-full { grid-column: 1/-1; background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: 11px; }
+    .info-cell-lbl { font-size: 8px; color: var(--muted); font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 3px; }
+    .info-cell-val { font-size: 13px; font-weight: 800; color: var(--text); }
+    .info-cell-text { font-size: 10px; color: var(--muted); font-weight: 600; line-height: 1.6; }
+    .nav-btn {
+      display: flex; align-items: center; justify-content: center; gap: 9px;
+      width: 100%; background: var(--orange); color: white;
+      font-family: 'Nunito', sans-serif; font-size: 12px; font-weight: 800;
+      padding: 13px; border-radius: 12px; text-decoration: none;
+      letter-spacing: 0.04em; margin-bottom: 14px; transition: opacity 0.2s;
+    }
+    .nav-btn:active { opacity: 0.85; }
+    .det-footer { display: flex; align-items: center; justify-content: space-between; }
+    .update-time { font-size: 9px; color: var(--muted); font-weight: 600; }
+    .refresh-btn {
+      background: var(--orange-light); border: 1.5px solid var(--orange-border);
+      color: var(--orange-dark); font-family: 'Nunito', sans-serif;
+      font-size: 10px; font-weight: 800; padding: 7px 13px; border-radius: 100px;
+      cursor: pointer; display: flex; align-items: center; gap: 5px;
+    }
+    .refresh-btn.spinning svg { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Leaflet overrides */
+    .leaflet-popup-content-wrapper { border-radius: 14px !important; padding: 0 !important; border: none !important; box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important; }
+    .leaflet-popup-content { margin: 14px !important; }
+    .leaflet-popup-tip-container { display: none; }
+    .leaflet-control-zoom { border: none !important; border-radius: 10px !important; overflow: hidden; }
+    .leaflet-control-zoom a { border: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <svg class="header-map-bg" width="160" height="160" viewBox="0 0 180 180">
+    <path d="M160 10 C150 30,140 50,130 70 C120 90,110 110,100 130 C90 150,80 165,70 175" stroke="#FF6B35" stroke-width="8" fill="none" stroke-linecap="round"/>
+    <path d="M90 0 C88 20,85 40,82 60 C79 80,76 100,73 120 C70 140,67 160,65 175" stroke="#FF6B35" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <ellipse cx="85" cy="95" rx="10" ry="30" stroke="#FF6B35" stroke-width="2" fill="none"/>
+    <line x1="55" y1="55" x2="150" y2="55" stroke="#FF6B35" stroke-width="1.5"/>
+    <line x1="50" y1="85" x2="155" y2="85" stroke="#FF6B35" stroke-width="1.5"/>
+    <line x1="45" y1="115" x2="155" y2="115" stroke="#FF6B35" stroke-width="1.5"/>
+    <line x1="110" y1="0" x2="110" y2="175" stroke="#FF6B35" stroke-width="1.5"/>
+  </svg>
+
+  <div class="header-top">
+    <div class="header-logo">
+      <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
+        <circle cx="14" cy="14" r="10" stroke="white" stroke-width="2"/>
+        <path d="M14 4C14 4,8 10,8 14C8 18.4,10.7 22,14 22C17.3 22,20 18.4,20 14C20 10,14 4 14 4Z" fill="white" opacity="0.9"/>
+        <circle cx="14" cy="14" r="2.5" fill="#FF6B35"/>
+        <line x1="4" y1="14" x2="24" y2="14" stroke="white" stroke-width="1.5" opacity="0.6"/>
+      </svg>
+    </div>
+    <div>
+      <div class="header-title">Lyon <span>Parking</span></div>
+      <div class="header-sub" id="header-sub">Chargement…</div>
+    </div>
+    <div class="header-badge"><div class="live-dot"></div>Live</div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat"><div class="stat-num" style="color:var(--green)" id="s-dispo">—</div><div class="stat-lbl">Disponibles</div></div>
+    <div class="stat"><div class="stat-num" style="color:var(--amber)" id="s-limite">—</div><div class="stat-lbl">Limités</div></div>
+    <div class="stat"><div class="stat-num" style="color:var(--red)" id="s-complet">—</div><div class="stat-lbl">Complets</div></div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" id="tab-tcl" onclick="switchTab('tcl')">🚇 P+R TCL</div>
+    <div class="tab" id="tab-op" onclick="switchTab('op')">🅿 LPA · Indigo · Q-Park</div>
+  </div>
+
+  <div class="view-toggle">
+    <button class="view-btn active" id="btn-list" onclick="switchView('list')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      Liste
+    </button>
+    <button class="view-btn" id="btn-map" onclick="switchView('map')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+      Carte
+    </button>
+  </div>
+
+  <div class="search-row">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input class="search-input" id="search" type="text" placeholder="Rechercher…" oninput="renderList()" />
+    </div>
+    <button class="fav-toggle" id="fav-toggle" onclick="toggleFavFilter()">★ Favoris</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LIST VIEW -->
+  <div class="list-view" id="list-view">
+    <div id="error-zone"></div>
+    <div id="parking-list"><div class="loading-msg">⏳ Chargement des parkings…</div></div>
+  </div>
+
+  <!-- MAP VIEW -->
+  <div class="map-view" id="map-view">
+    <div id="map"></div>
+    <button class="map-overlay-btn" onclick="centerOnUser()" title="Ma position">📍</button>
+  </div>
+
+  <!-- DETAIL VIEW -->
+  <div class="detail-view" id="detail-view">
+    <button class="back-btn" onclick="closeDetail()">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+      Retour
+    </button>
+    <div class="det-card">
+      <div class="det-header">
+        <div class="det-icon" id="det-icon"></div>
+        <div>
+          <div class="det-name" id="det-name"></div>
+          <div class="det-addr" id="det-addr"></div>
+        </div>
+      </div>
+      <div id="det-error"></div>
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
+        <div class="det-num c-green" id="det-num">—</div>
+        <div class="det-label" id="det-lbl">places<br>libres</div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-meta"><span>OCCUPATION</span><span id="det-pct">—</span></div>
+        <div class="progress-track"><div class="progress-fill bg-green" id="det-prog" style="width:0%"></div></div>
+      </div>
+      <div class="status-pill c-green" id="det-status">—</div>
+
+      <div id="tarifs-section">
+        <div class="tarifs-title">Tarifs</div>
+        <div class="tarifs-grid">
+          <div class="tarif-cell"><div class="tarif-lbl">1h</div><div class="tarif-val" id="t1h">—</div></div>
+          <div class="tarif-cell"><div class="tarif-lbl">2h</div><div class="tarif-val" id="t2h">—</div></div>
+          <div class="tarif-cell"><div class="tarif-lbl">4h</div><div class="tarif-val" id="t4h">—</div></div>
+          <div class="tarif-cell"><div class="tarif-lbl">24h</div><div class="tarif-val" id="t24h">—</div></div>
+        </div>
+      </div>
+
+      <div class="info-grid">
+        <div class="info-cell"><div class="info-cell-lbl">Capacité</div><div class="info-cell-val" id="det-cap">—</div></div>
+        <div class="info-cell"><div class="info-cell-lbl">Places PMR</div><div class="info-cell-val" id="det-pmr">—</div></div>
+        <div class="info-cell-full" id="det-horaires-cell" style="display:none">
+          <div class="info-cell-lbl">Horaires</div>
+          <div class="info-cell-text" id="det-horaires"></div>
+        </div>
+      </div>
+
+      <a id="nav-btn" class="nav-btn" href="#" target="_blank" rel="noopener">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        Se diriger vers le parking
+      </a>
+
+      <div class="det-footer">
+        <div class="update-time" id="det-update">—</div>
+        <button class="refresh-btn" id="refresh-btn" onclick="refreshDetail()">
+          <svg id="refresh-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+          Actualiser
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const WORKER_URL = "https://lyon-parking-premium.jean-luc-perrotto.workers.dev";
+const GPS_TCL = {
+  'ALP':{lat:45.7181865,lng:4.9270161},'BELA':{lat:45.6926743,lng:4.9567400},
+  'BON':{lat:45.7650778,lng:4.9097108},'CUI':{lat:45.7860531,lng:4.8313213},
+  'DECC':{lat:45.7709080,lng:4.9539465},'DECG':{lat:45.7746803,lng:4.9765677},
+  'GOR':{lat:45.7667619,lng:4.8032697},'GREY':{lat:45.7477438,lng:4.6972905},
+  'HFVE':{lat:45.6886393,lng:4.8640701},'HLS':{lat:45.7018287,lng:4.8044086},
+  'IRYV':{lat:45.6893217,lng:4.8310262},'MERP':{lat:45.7304861,lng:4.8897761},
+  'MEYG':{lat:45.7717370,lng:4.9971659},'MEYP':{lat:45.7661093,lng:5.0357651},
+  'MEYZ':{lat:45.7684301,lng:5.0333604},'OULN':{lat:45.7175471,lng:4.8148837},
+  'PAR':{lat:45.7201496,lng:4.8857467},'PORL':{lat:45.8235555,lng:4.7629362},
+  'SOI':{lat:45.7600685,lng:4.9219167},'VAI1':{lat:45.7818860,lng:4.8059600},
+  'VAI2':{lat:45.7818860,lng:4.8059600},'VEN':{lat:45.7055849,lng:4.8887287},
+};
+
+let allData = { operateurs: [], tcl: [] };
+let currentTab = 'tcl';
+let currentView = 'list';
+let favOnly = false;
+let favorites = JSON.parse(localStorage.getItem('lp_favorites') || '[]');
+let selectedParking = null;
+let refreshTimer = null;
+let map = null;
+let markers = [];
+
+// ── STATUT ──
+function getStatus(dispo, cap) {
+  if (dispo === null || dispo === undefined || dispo < 0)
+    return { label: 'Non disponible', cls: 'gray', pct: 0 };
+  if (dispo === 0) return { label: 'Complet', cls: 'red', pct: 0 };
+  if (!cap) return { label: 'Disponible', cls: 'green', pct: 80 };
+  const pct = dispo / cap;
+  if (pct <= .2) return { label: 'Presque plein', cls: 'red', pct: Math.round(pct*100) };
+  if (pct <= .5) return { label: 'Limité', cls: 'amber', pct: Math.round(pct*100) };
+  return { label: 'Disponible', cls: 'green', pct: Math.round(pct*100) };
+}
+
+function gMeta(g) {
+  if (g === 'LPA') return { lbl: 'LPA', cls: 'g-lpa' };
+  if (g === 'INDIGO') return { lbl: 'IND', cls: 'g-ind' };
+  if (g === 'Q PARK') return { lbl: 'Q', cls: 'g-qpk' };
+  return { lbl: 'TCL', cls: 'g-tcl' };
+}
+
+// ── FAVORIS ──
+function isFav(id) { return favorites.includes(id); }
+function toggleFav(id, e) {
+  e.stopPropagation();
+  if (isFav(id)) favorites = favorites.filter(f => f !== id);
+  else favorites.push(id);
+  localStorage.setItem('lp_favorites', JSON.stringify(favorites));
+  renderList();
+  if (map) renderMap();
+}
+function toggleFavFilter() {
+  favOnly = !favOnly;
+  document.getElementById('fav-toggle').classList.toggle('active', favOnly);
+  renderList();
+}
+
+// ── CHARGEMENT ──
+async function loadData() {
+  document.getElementById('error-zone').innerHTML = '';
+  document.getElementById('parking-list').innerHTML = '<div class="loading-msg">⏳ Chargement…</div>';
+  try {
+    const res = await fetch(WORKER_URL);
+    if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
+    allData = await res.json();
+    // Injecter GPS TCL
+    allData.tcl.forEach(p => {
+      if (GPS_TCL[p.id]) { p.lat = GPS_TCL[p.id].lat; p.lng = GPS_TCL[p.id].lng; }
+    });
+    updateStats();
+    renderList();
+    if (map) renderMap();
+  } catch(e) {
+    document.getElementById('error-zone').innerHTML = `<div class="error-msg">⚠️ ${e.message}</div>`;
+    document.getElementById('parking-list').innerHTML = '';
+  }
+}
+
+// ── STATS ──
+function updateStats() {
+  const src = currentTab === 'tcl' ? allData.tcl : allData.operateurs;
+  let dispo = 0, limite = 0, complet = 0;
+  src.forEach(p => {
+    const nb = p.nb_places;
+    const cap = p.capacite || null;
+    const s = getStatus(nb, cap);
+    if (s.cls === 'green') dispo++;
+    else if (s.cls === 'amber') limite++;
+    else if (s.cls === 'red') complet++;
+  });
+  document.getElementById('s-dispo').textContent = dispo;
+  document.getElementById('s-limite').textContent = limite;
+  document.getElementById('s-complet').textContent = complet;
+  document.getElementById('header-sub').textContent = `Temps réel · ${src.length} parkings`;
+}
+
+// ── ONGLETS ──
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-tcl').className = 'tab' + (tab === 'tcl' ? ' active' : '');
+  document.getElementById('tab-op').className = 'tab' + (tab === 'op' ? ' active' : '');
+  document.getElementById('search').value = '';
+  updateStats();
+  renderList();
+  if (map) renderMap();
+}
+
+// ── VUES ──
+function switchView(view) {
+  currentView = view;
+  document.getElementById('btn-list').className = 'view-btn' + (view === 'list' ? ' active' : '');
+  document.getElementById('btn-map').className = 'view-btn' + (view === 'map' ? ' active' : '');
+  document.getElementById('list-view').style.display = view === 'list' ? 'block' : 'none';
+  document.getElementById('map-view').style.display = view === 'map' ? 'block' : 'none';
+  if (view === 'map') {
+    if (!map) initMap();
+    else { map.invalidateSize(); renderMap(); }
+  }
+}
+
+// ── LISTE ──
+function renderList() {
+  const q = document.getElementById('search').value.toLowerCase().trim();
+  const src = currentTab === 'tcl' ? allData.tcl : allData.operateurs;
+  let list = src;
+  if (q) list = list.filter(p => p.nom.toLowerCase().includes(q) || (p.adresse||'').toLowerCase().includes(q));
+  if (favOnly) list = list.filter(p => isFav(p.id));
+
+  const favs = list.filter(p => isFav(p.id));
+  const rest = list.filter(p => !isFav(p.id));
+  const el = document.getElementById('parking-list');
+
+  if (!list.length) { el.innerHTML = '<div class="empty-msg">Aucun résultat</div>'; return; }
+
+  let html = '';
+  if (favs.length) {
+    html += `<div class="section-label">★ Mes favoris</div><div class="parking-list">`;
+    favs.forEach(p => { html += parkingItemHTML(p); });
+    html += `</div>`;
+  }
+  if (rest.length) {
+    if (favs.length) html += `<div class="section-label section-label-all">Tous les parkings</div>`;
+    html += `<div class="parking-list">`;
+    rest.forEach(p => { html += parkingItemHTML(p); });
+    html += `</div>`;
+  }
+  el.innerHTML = html;
+}
+
+function parkingItemHTML(p) {
+  const isOp = currentTab === 'op';
+  const nb = p.nb_places;
+  const cap = p.capacite || null;
+  const s = getStatus(nb, cap);
+  const g = gMeta(p.gestionnaire);
+  const fav = isFav(p.id);
+  const numStr = (nb === null || nb < 0) ? '—' : nb;
+  const meta = isOp
+    ? `${p.adresse || ''} · ${p.tarif_1h ? p.tarif_1h + ' €/h' : 'Tarif N/D'}`
+    : `${cap || '?'} places · Gratuit TCL`;
+  return `<div class="parking-item${fav ? ' favori' : ''}" onclick="showDetail('${p.id}')">
+    <button class="star-btn${fav ? ' on' : ''}" onclick="toggleFav('${p.id}',event)" title="${fav ? 'Retirer des favoris' : 'Ajouter aux favoris'}">${fav ? '★' : '☆'}</button>
+    <div class="p-icon ${g.cls}">${g.lbl}</div>
+    <div class="p-info">
+      <div class="p-name">${p.nom}</div>
+      <div class="p-meta">${meta}</div>
+    </div>
+    <div class="p-right">
+      <div class="p-places c-${s.cls}">${numStr}</div>
+      <div class="p-dot bg-${s.cls}"></div>
+    </div>
+  </div>`;
+}
+
+// ── CARTE ──
+function initMap() {
+  map = L.map('map', { zoomControl: true }).setView([45.748, 4.846], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap',
+    maxZoom: 18,
+  }).addTo(map);
+  setTimeout(() => { map.invalidateSize(); renderMap(); }, 200);
+}
+
+function renderMap() {
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+  const src = currentTab === 'tcl' ? allData.tcl : allData.operateurs;
+  src.forEach(p => {
+    if (!p.lat || !p.lng) return;
+    const nb = p.nb_places;
+    const cap = p.capacite || null;
+    const s = getStatus(nb, cap);
+    const colorMap = { green: '#2ECC71', amber: '#FF9500', red: '#FF3B30', gray: '#AAA' };
+    const color = colorMap[s.cls];
+    const fav = isFav(p.id);
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="background:${color};color:white;border-radius:50%;width:${fav?36:30}px;height:${fav?36:30}px;display:flex;align-items:center;justify-content:center;font-family:'Nunito',sans-serif;font-size:${fav?11:10}px;font-weight:900;border:${fav?'2.5px solid #FF9500':'2px solid white'};box-shadow:0 2px 8px rgba(0,0,0,0.25);line-height:1">${(nb === null || nb < 0) ? '?' : nb > 999 ? '1k+' : nb}</div>`,
+      iconSize: [fav?36:30, fav?36:30],
+      iconAnchor: [fav?18:15, fav?18:15],
+    });
+    const g = gMeta(p.gestionnaire);
+    const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=driving`;
+    const popup = L.popup({ maxWidth: 220, minWidth: 180 }).setContent(`
+      <div class="lp-popup">
+        <div class="lp-popup-header">
+          <div class="lp-popup-icon ${g.cls}">${g.lbl}</div>
+          <div class="lp-popup-name">${p.nom}</div>
+        </div>
+        <div class="lp-popup-places c-${s.cls}">${(nb === null || nb < 0) ? '—' : nb}</div>
+        <div class="lp-popup-sub">${s.label} · ${cap ? cap + ' places' : ''}</div>
+        <a href="${navUrl}" target="_blank" class="lp-popup-btn">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+          S'y rendre
+        </a>
+      </div>
+    `);
+    const marker = L.marker([p.lat, p.lng], { icon }).addTo(map).bindPopup(popup);
+    marker.on('click', () => marker.openPopup());
+    markers.push(marker);
+  });
+}
+
+function centerOnUser() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(pos => {
+    map.setView([pos.coords.latitude, pos.coords.longitude], 14);
+    L.circleMarker([pos.coords.latitude, pos.coords.longitude], {
+      radius: 8, color: '#FF6B35', fillColor: '#FF6B35', fillOpacity: 1, weight: 2,
+    }).addTo(map).bindPopup('Votre position').openPopup();
+  });
+}
+
+// ── DETAIL ──
+function showDetail(id) {
+  const src = currentTab === 'tcl' ? allData.tcl : allData.operateurs;
+  selectedParking = { ...src.find(p => p.id === id), tab: currentTab };
+  if (!selectedParking) return;
+  document.getElementById('detail-view').style.display = 'block';
+  updateDetail(selectedParking);
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(refreshDetail, 120000);
+}
+
+function closeDetail() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  selectedParking = null;
+  document.getElementById('detail-view').style.display = 'none';
+}
+
+async function refreshDetail() {
+  const btn = document.getElementById('refresh-btn');
+  btn.disabled = true; btn.classList.add('spinning');
+  document.getElementById('det-error').innerHTML = '';
+  try {
+    const res = await fetch(WORKER_URL);
+    if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
+    const data = await res.json();
+    data.tcl.forEach(p => { if (GPS_TCL[p.id]) { p.lat = GPS_TCL[p.id].lat; p.lng = GPS_TCL[p.id].lng; } });
+    allData = data;
+    const src = selectedParking.tab === 'tcl' ? data.tcl : data.operateurs;
+    const p = src.find(x => x.id === selectedParking.id);
+    if (!p) throw new Error('Parking introuvable');
+    selectedParking = { ...p, tab: selectedParking.tab };
+    updateDetail(selectedParking);
+    updateStats(); renderList(); if (map) renderMap();
+  } catch(e) {
+    document.getElementById('det-error').innerHTML = `<div class="error-msg">⚠️ ${e.message}</div>`;
+  } finally {
+    btn.disabled = false; btn.classList.remove('spinning');
+  }
+}
+
+function updateDetail(p) {
+  const isOp = p.tab === 'op';
+  const nb = p.nb_places;
+  const cap = p.capacite || null;
+  const s = getStatus(nb, cap);
+  const g = gMeta(p.gestionnaire);
+
+  const icon = document.getElementById('det-icon');
+  icon.textContent = g.lbl; icon.className = 'det-icon ' + g.cls;
+  document.getElementById('det-name').textContent = p.nom;
+  document.getElementById('det-addr').textContent = p.adresse || (isOp ? '' : 'Parc Relais TCL');
+
+  document.getElementById('det-num').textContent = (nb === null || nb < 0) ? '—' : nb;
+  document.getElementById('det-num').className = `det-num c-${s.cls}`;
+  document.getElementById('det-pct').textContent = (cap && s.pct) ? `${100 - s.pct}% occupé` : '—';
+  document.getElementById('det-prog').style.width = s.pct + '%';
+  document.getElementById('det-prog').className = `progress-fill bg-${s.cls}`;
+  document.getElementById('det-status').textContent = s.label;
+  document.getElementById('det-status').className = `status-pill c-${s.cls}`;
+
+  document.getElementById('det-cap').textContent = cap ? cap + ' places' : (isOp && nb >= 0 ? nb + ' places' : '—');
+  document.getElementById('det-pmr').textContent = p.nb_pmr ? p.nb_pmr + ' places' : '—';
+
+  const tarifsSection = document.getElementById('tarifs-section');
+  const horCell = document.getElementById('det-horaires-cell');
+  if (isOp) {
+    tarifsSection.style.display = 'block'; horCell.style.display = 'none';
+    document.getElementById('t1h').textContent = p.tarif_1h ? p.tarif_1h + ' €' : '—';
+    document.getElementById('t2h').textContent = p.tarif_2h ? p.tarif_2h + ' €' : '—';
+    document.getElementById('t4h').textContent = p.tarif_4h ? p.tarif_4h + ' €' : '—';
+    document.getElementById('t24h').textContent = p.tarif_24h ? p.tarif_24h + ' €' : '—';
+  } else {
+    tarifsSection.style.display = 'none';
+    if (p.horaires) { horCell.style.display = 'block'; document.getElementById('det-horaires').textContent = p.horaires; }
+    else { horCell.style.display = 'none'; }
+  }
+
+  const navBtn = document.getElementById('nav-btn');
+  if (p.lat && p.lng) {
+    navBtn.href = `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=driving`;
+    navBtn.style.opacity = '1'; navBtn.style.pointerEvents = 'auto';
+  } else {
+    navBtn.href = '#'; navBtn.style.opacity = '0.35'; navBtn.style.pointerEvents = 'none';
+  }
+  document.getElementById('det-update').textContent = 'màj ' + new Date().toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+// ── INIT ──
+loadData();
+setInterval(() => { if (!selectedParking) { loadData(); } }, 120000);
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
