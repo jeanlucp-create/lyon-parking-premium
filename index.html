@@ -484,10 +484,12 @@ async function loadData() {
 
 // ── STATS ──
 function updateStats() {
+  // Ouvert = places_disponibles > 0
+  // Complet = places_disponibles === 0 OU etat === 'complet'
   const tclOpen = allData.tcl.filter(p => p.places_disponibles > 0).length;
-  const tclFull = allData.tcl.filter(p => p.places_disponibles === 0 && p.etat === 'ouvert').length;
+  const tclFull = allData.tcl.filter(p => p.places_disponibles === 0 || p.etat === 'complet').length;
   const opOpen = allData.operateurs.filter(p => p.places_disponibles > 0).length;
-  const opFull = allData.operateurs.filter(p => p.places_disponibles === 0 && p.etat === 'ouvert').length;
+  const opFull = allData.operateurs.filter(p => p.places_disponibles === 0 || p.etat === 'complet').length;
   document.getElementById('s-tcl-open').textContent = tclOpen;
   document.getElementById('s-tcl-full').textContent = tclFull;
   document.getElementById('s-op-open').textContent = opOpen;
