@@ -362,10 +362,16 @@
         </div>
       </div>
 
-      <a id="nav-btn" class="nav-btn" href="#" target="_blank" rel="noopener">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-        Se diriger vers le parking
-      </a>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <a id="nav-btn" class="nav-btn" href="#" target="_blank" rel="noopener" style="flex:1;margin-bottom:0">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+          S'y rendre
+        </a>
+        <button id="map-btn" onclick="showOnMap()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--orange-light);border:1.5px solid var(--orange-border);color:var(--orange-dark);font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;padding:13px;border-radius:12px;cursor:pointer;letter-spacing:.04em;transition:opacity .2s">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+          Voir sur la carte
+        </button>
+      </div>
 
       <div class="det-footer">
         <div class="update-time" id="det-update">—</div>
@@ -646,6 +652,23 @@ function centerOnUser() {
 }
 
 // ── DETAIL ──
+function showOnMap() {
+  if (!selectedParking) return;
+  const p = selectedParking;
+  closeDetail();
+  switchView('map');
+  setTimeout(() => {
+    if (!map || !p.lat || !p.lng) return;
+    map.setView([p.lat, p.lng], 16);
+    markers.forEach(m => {
+      const ll = m.getLatLng();
+      if (Math.abs(ll.lat - p.lat) < 0.0001 && Math.abs(ll.lng - p.lng) < 0.0001) {
+        m.openPopup();
+      }
+    });
+  }, 350);
+}
+
 function showDetail(id) {
   const src = currentTab === 'tcl' ? allData.tcl : allData.operateurs;
   selectedParking = { ...src.find(p => p.id === id), tab: currentTab };
@@ -752,5 +775,13 @@ loadData();
 setInterval(() => { if (!selectedParking) { loadData(); } }, 120000);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
+
+<!-- Mention légale Licence Mobilités -->
+<div style="text-align:center;padding:12px 16px 20px;position:relative;z-index:1">
+  <p style="font-family:'Nunito',sans-serif;font-size:9px;color:var(--muted);line-height:1.5;letter-spacing:0.03em">
+    Données : <a href="https://data.grandlyon.com" target="_blank" rel="noopener" style="color:var(--muted);text-decoration:underline">Grand Lyon Open Data</a> — 
+    <a href="https://transport.data.gouv.fr/resources/licence-mobilites" target="_blank" rel="noopener" style="color:var(--muted);text-decoration:underline">Licence Mobilités</a>
+  </p>
+</div></script>
 </body>
 </html>
