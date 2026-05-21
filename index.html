@@ -53,10 +53,11 @@
     @keyframes lpulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
 
     /* Stats */
-    .stats-row { display: flex; gap: 6px; margin-bottom: 10px; position: relative; z-index: 1; }
-    .stat { flex: 1; background: var(--white); border-radius: 10px; border: 1px solid var(--orange-border); padding: 8px 10px; text-align: center; }
-    .stat-num { font-size: 16px; font-weight: 900; line-height: 1; }
-    .stat-lbl { font-size: 8px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+    .stats-row { margin-bottom: 10px; position: relative; z-index: 1; }
+    .stat-line { font-size: 9.5px; font-weight: 700; color: var(--muted); display: flex; align-items: center; gap: 3px; flex-wrap: wrap; line-height: 1.6; }
+    .stat-line .s-open { color: var(--green); font-weight: 900; }
+    .stat-line .s-full { color: var(--red); font-weight: 900; }
+    .stat-line .s-sep { color: #FFD4B0; margin: 0 1px; }
 
     /* Tabs */
     .tabs { display: flex; gap: 5px; margin-bottom: 10px; position: relative; z-index: 1; }
@@ -269,13 +270,25 @@
       <div class="header-title">Lyon <span>Parking</span></div>
       <div class="header-sub" id="header-sub">Chargement…</div>
     </div>
-    <div class="header-badge"><div class="live-dot"></div>Live</div>
+    
   </div>
 
   <div class="stats-row">
-    <div class="stat"><div class="stat-num" style="color:var(--green)" id="s-dispo">—</div><div class="stat-lbl">Disponibles</div></div>
-    <div class="stat"><div class="stat-num" style="color:var(--amber)" id="s-limite">—</div><div class="stat-lbl">Limités</div></div>
-    <div class="stat"><div class="stat-num" style="color:var(--red)" id="s-complet">—</div><div class="stat-lbl">Complets</div></div>
+    <div class="stat-line">
+      <span>🚇 P+R TCL :</span>
+      <span class="s-open" id="s-tcl-open">—</span>
+      <span>ouverts</span>
+      <span class="s-sep">·</span>
+      <span class="s-full" id="s-tcl-full">—</span>
+      <span>complets</span>
+      <span class="s-sep" style="margin:0 6px;color:#FFD4B0">|</span>
+      <span>🅿 LPA·Indigo·Q-Park :</span>
+      <span class="s-open" id="s-op-open">—</span>
+      <span>ouverts</span>
+      <span class="s-sep">·</span>
+      <span class="s-full" id="s-op-full">—</span>
+      <span>complets</span>
+    </div>
   </div>
 
   <div class="tabs">
@@ -471,20 +484,15 @@ async function loadData() {
 
 // ── STATS ──
 function updateStats() {
-  const src = currentTab === 'tcl' ? allData.tcl : allData.operateurs;
-  let dispo = 0, limite = 0, complet = 0;
-  src.forEach(p => {
-    const nb = p.places_disponibles;
-    const cap = p.nb_places || null;
-    const s = getStatus(nb, cap);
-    if (s.cls === 'green') dispo++;
-    else if (s.cls === 'amber') limite++;
-    else if (s.cls === 'red') complet++;
-  });
-  document.getElementById('s-dispo').textContent = dispo;
-  document.getElementById('s-limite').textContent = limite;
-  document.getElementById('s-complet').textContent = complet;
-  document.getElementById('header-sub').textContent = `Temps réel · ${src.length} parkings`;
+  const tclOpen = allData.tcl.filter(p => p.places_disponibles > 0).length;
+  const tclFull = allData.tcl.filter(p => p.places_disponibles === 0 && p.etat === 'ouvert').length;
+  const opOpen = allData.operateurs.filter(p => p.places_disponibles > 0).length;
+  const opFull = allData.operateurs.filter(p => p.places_disponibles === 0 && p.etat === 'ouvert').length;
+  document.getElementById('s-tcl-open').textContent = tclOpen;
+  document.getElementById('s-tcl-full').textContent = tclFull;
+  document.getElementById('s-op-open').textContent = opOpen;
+  document.getElementById('s-op-full').textContent = opFull;
+  document.getElementById('header-sub').textContent = `Temps réel · ${allData.tcl.length + allData.operateurs.length} parkings`;
 }
 
 // ── ONGLETS ──
